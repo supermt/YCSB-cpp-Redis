@@ -2,10 +2,18 @@
 
 This repo add supports of Redis in YCSB-CPP (written by LEE)
 
+# Usage:
+
+```
+./ycsb -run -db redis -P workloads/workloada -P redis/cluster.prop -s
+```
+
 # YCSB-cpp
 
-Yahoo! Cloud Serving Benchmark([YCSB](https://github.com/brianfrankcooper/YCSB/wiki)) written in C++.
-This is a fork of [YCSB-C](https://github.com/basicthinker/YCSB-C) with following changes.
+Yahoo! Cloud Serving
+Benchmark([YCSB](https://github.com/brianfrankcooper/YCSB/wiki)) written in C++.
+This is a fork of [YCSB-C](https://github.com/basicthinker/YCSB-C) with
+following changes.
 
 * Make Zipf distribution and data value more similar to the original YCSB
 * Status and latency report during benchmark
@@ -15,7 +23,8 @@ This is a fork of [YCSB-C](https://github.com/basicthinker/YCSB-C) with followin
 
 Simply use `make` to build.
 
-The databases to bind must be specified. You may also need to add additional link flags (e.g., `-lsnappy`).
+The databases to bind must be specified. You may also need to add additional
+link flags (e.g., `-lsnappy`).
 
 To bind LevelDB:
 

@@ -14,59 +14,96 @@
 #include "core/utils.h"
 
 namespace {
-    const std::string REDIS_PORT = "reids.port";
-    const std::string REDIS_PORT_DEFAULT = "30001";
+  const std::string REDIS_PORT = "redis.port";
+  const std::string REDIS_PORT_DEFAULT = "30001";
 
-    const std::string REDIS_HOST = "redis.host";
-    const std::string REDIS_HOST_DEFAULT = "127.0.0.1";
+  const std::string REDIS_HOST = "redis.host";
+  const std::string REDIS_HOST_DEFAULT = "127.0.0.1";
+
+  const std::string REDIS_INDEX_NAME = "redis.index";
+  const std::string REDIS_INDEX_NAME_DEFAULT = "_indices";
+
 } // anonymous
 
 namespace ycsbc {
 
 // Create Redis link
-    using namespace sw::redis;
-    const bool registered = DBFactory::RegisterDB("redis", NewRedisDB);
+  using namespace sw::redis;
+  const bool registered = DBFactory::RegisterDB("redis", NewRedisDB);
 
-    DB *NewRedisDB() {
+  DB *NewRedisDB() {
+   return new RedisDB;
+  }
 
-        return new RedisDB;
-    }
+  void RedisDB::Init() {
+   auto host = props_->GetProperty(REDIS_HOST, REDIS_HOST_DEFAULT);
+   auto port = props_->GetProperty(REDIS_PORT, REDIS_PORT_DEFAULT);
 
-    void RedisDB::Init() {
-        std::cout << "Initializing, create redis cluster link" << std::endl;
-        auto host = props_->GetProperty(REDIS_HOST, REDIS_HOST_DEFAULT);
-        auto port = props_->GetProperty(REDIS_PORT, REDIS_PORT_DEFAULT);
-        cluster_ptr = new RedisCluster("tcp://" + host + ":" + port);
-        std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Connected! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
-        return;
-    }
+   std::string target_link_posi = "tcp://" + host + ":" + port;
+   std::cout << "Initializing, create redis cluster link at "
+             << target_link_posi << std::endl;
 
-    void RedisDB::Cleanup() {
-        std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Clean the DB, close the redis cluster <<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+   cluster_ptr = new RedisCluster(target_link_posi);
+   std::cout
+       << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Connected! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+       << std::endl;
 
-        return;
-    }
+   ycsb_command_ptr = new Redis(cluster_ptr->redis("ycsb_link"));;
 
-    DB::Status RedisDB::Read(const std::string &table, const std::string &key, const std::vector<std::string> *fields,
-                             std::vector<Field> &result) {
-        return DB::kNotFound;
-    }
+   auto reply = ycsb_command_ptr->command("stats");
+   assert(reply);
+   auto val = reply::parse<OptionalString>(*reply);
+   if (val) {
+    std::cout << *val << std::endl;
+   }
+   return;
+  }
 
-    DB::Status
-    RedisDB::Scan(const std::string &table, const std::string &key, int len, const std::vector<std::string> *fields,
-                  std::vector<std::vector<Field>> &result) {
-        return DB::kNotFound;
-    }
+  void RedisDB::Cleanup() {
 
-    DB::Status RedisDB::Update(const std::string &table, const std::string &key, std::vector<Field> &values) {
-        return DB::kNotFound;
-    }
+   auto reply = ycsb_command_ptr->command("stats");
+   assert(reply);
+   auto val = reply::parse<OptionalString>(*reply);
+   if (val) {
+    std::cout << *val << std::endl;
+   }
+   delete ycsb_command_ptr;
+   delete cluster_ptr;
+   std::cout
+       << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Clean the DB, close the redis cluster <<<<<<<<<<<<<<<<<<<<<<<<<<<"
+       << std::endl;
 
-    DB::Status RedisDB::Insert(const std::string &table, const std::string &key, std::vector<Field> &values) {
-        return DB::kNotFound;
-    }
+   return;
+  }
 
-    DB::Status RedisDB::Delete(const std::string &table, const std::string &key) {
-        return DB::kNotFound;
-    }
+  DB::Status RedisDB::Read(const std::string &table, const std::string &key,
+                           const std::vector<std::string> *fields,
+                           std::unordered_map<std::string, std::string> &result) {
+   return DB::kNotFound;
+  }
+
+  DB::Status
+  RedisDB::Scan(const std::string &table, const std::string &key, int len,
+                const std::vector<std::string> *fields,
+                std::vector<std::unordered_map<std::string, std::string>> &result) {
+   return DB::kNotFound;
+  }
+
+  DB::Status RedisDB::Update(const std::string &table, const std::string &key,
+                             std::unordered_map<std::string, std::string> &values) {
+   return DB::kNotFound;
+  }
+
+  DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
+                             std::unordered_map<std::string, std::string> &values) {
+   std::unordered_map<std::string, std::string> input_stream;
+   ycsb_command_ptr->hmset(key, input_stream.begin(), input_stream.end());
+
+   return DB::kNotFound;
+  }
+
+  DB::Status RedisDB::Delete(const std::string &table, const std::string &key) {
+   return DB::kNotFound;
+  }
+
 } // ycsbc

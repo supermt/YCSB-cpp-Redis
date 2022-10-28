@@ -15,37 +15,43 @@
 #include "core/properties.h"
 
 #include <sw/redis++/redis++.h>
+#include <sw/redis++/redis.h>
 
 namespace ycsbc {
 
-    class RedisDB : public DB {
-    public:
+  class RedisDB : public DB {
+  public:
 
-        void Init();
+    void Init();
 
-        void Cleanup();
+    void Cleanup();
 
-        Status Read(const std::string &table, const std::string &key,
-                    const std::vector<std::string> *fields, std::vector<Field> &result);
+    Status Read(const std::string &table, const std::string &key,
+                const std::vector<std::string> *fields,
+                std::unordered_map<std::string, std::string> &result);
 
-        Status Scan(const std::string &table, const std::string &key, int len,
-                    const std::vector<std::string> *fields, std::vector<std::vector<Field>> &result);
+    Status Scan(const std::string &table, const std::string &key, int len,
+                const std::vector<std::string> *fields,
+                std::vector<std::unordered_map<std::string, std::string>> &result);
 
-        Status Update(const std::string &table, const std::string &key, std::vector<Field> &values);
+    Status Update(const std::string &table, const std::string &key,
+                  std::unordered_map<std::string, std::string> &values);
 
-        Status Insert(const std::string &table, const std::string &key, std::vector<Field> &values);
+    Status Insert(const std::string &table, const std::string &key,
+                  std::unordered_map<std::string, std::string> &values);
 
-        Status Delete(const std::string &table, const std::string &key);
+    Status Delete(const std::string &table, const std::string &key);
 
-    private:
+  private:
 
-        sw::redis::RedisCluster *cluster_ptr;
-        int fieldcount_;
-        static int ref_cnt_;
-        static std::mutex mu_;
-    };
+    sw::redis::RedisCluster *cluster_ptr;
+    sw::redis::Redis *ycsb_command_ptr;
+    int fieldcount_;
+    static int ref_cnt_;
+    static std::mutex mu_;
+  };
 
-    DB *NewRedisDB();
+  DB *NewRedisDB();
 
 } // ycsbc
 
