@@ -1,0 +1,3 @@
+[submodule "redis/support/redis-plus-plus"]
+	path = redis/support/redis-plus-plus
+	url = https://github.com/sewenew/redis-plus-plus
