@@ -49,6 +49,7 @@ namespace ycsbc {
     int fieldcount_;
     static int ref_cnt_;
     static std::mutex mu_;
+    std::string index_name;
   };
 
   DB *NewRedisDB();

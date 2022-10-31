@@ -39,6 +39,8 @@ namespace ycsbc {
    auto host = props_->GetProperty(REDIS_HOST, REDIS_HOST_DEFAULT);
    auto port = props_->GetProperty(REDIS_PORT, REDIS_PORT_DEFAULT);
 
+   index_name = props_->GetProperty(REDIS_INDEX_NAME, REDIS_INDEX_NAME_DEFAULT);
+
    std::string target_link_posi = "tcp://" + host + ":" + port;
    std::cout << "Initializing, create redis cluster link at "
              << target_link_posi << std::endl;
@@ -79,31 +81,102 @@ namespace ycsbc {
   DB::Status RedisDB::Read(const std::string &table, const std::string &key,
                            const std::vector<std::string> *fields,
                            std::unordered_map<std::string, std::string> &result) {
-   return DB::kNotFound;
+   if (fields == nullptr) {
+    ycsb_command_ptr->hgetall(key, std::inserter(result, result.begin()));
+   } else {
+    std::vector<OptionalString> vals;
+    ycsb_command_ptr->hmget(key, fields->begin(), fields->end(),
+                            std::back_inserter(vals));
+
+    for (uint32_t i = 0; i < fields->size(); i++) {
+     result.emplace(fields->at(i), vals.at(i).value());
+    }
+//    auto field_iter = fields->begin();
+//    auto value_iter = vals.begin();
+//    while (field_iter != fields->end() && value_iter != vals.end()) {
+//     result.emplace(*field_iter, *value_iter);
+//    }
+   }
+   return result.size() == 0 ? kNotFound : kOK;
   }
 
-  DB::Status
-  RedisDB::Scan(const std::string &table, const std::string &key, int len,
-                const std::vector<std::string> *fields,
-                std::vector<std::unordered_map<std::string, std::string>> &result) {
-   return DB::kNotFound;
+  inline std::wstring s2ws(const std::string &str) {
+   if (str.empty()) {
+    return L"";
+   }
+   unsigned len = str.size() + 1;
+   setlocale(LC_CTYPE, "en_US.UTF-8");
+   wchar_t *p = new wchar_t[len];
+   mbstowcs(p, str.c_str(), len);
+   std::wstring w_str(p);
+   delete[] p;
+   return w_str;
   }
+
+  inline int32_t hash(const std::string &input) {
+   int32_t h = 0;
+   std::wstring wstr = s2ws(input);
+   if (h == 0 && wstr.length() > 0) {
+    for (uint32_t i = 0; i < wstr.length(); i++) {
+     h = 31 * h + wstr.at(i);
+    }
+   }
+   return h;
+  }
+
 
   DB::Status RedisDB::Update(const std::string &table, const std::string &key,
                              std::unordered_map<std::string, std::string> &values) {
+   try {
+    ycsb_command_ptr->hmset(key, values.begin(),
+                            values.end());
+    return DB::kOK;
+   } catch (utils::Exception e) {
+    std::cout << e.what() << std::endl;
+    return DB::kError;
+   }
    return DB::kNotFound;
   }
 
   DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
                              std::unordered_map<std::string, std::string> &values) {
-   std::unordered_map<std::string, std::string> input_stream;
-   ycsb_command_ptr->hmset(key, input_stream.begin(), input_stream.end());
-
-   return DB::kNotFound;
+   try {
+    ycsb_command_ptr->hmset(key, values.begin(),
+                            values.end());
+    ycsb_command_ptr->zadd(index_name, key, hash(key));
+    return DB::kOK;
+   } catch (utils::Exception e) {
+    std::cout << e.what() << std::endl;
+    return DB::kError;
+   }
   }
 
   DB::Status RedisDB::Delete(const std::string &table, const std::string &key) {
-   return DB::kNotFound;
+   if (ycsb_command_ptr->del(key) == 0 &&
+       ycsb_command_ptr->zrem(index_name, key) == 0) {
+    return DB::kError;
+   } else {
+    return DB::kOK;
+   }
+
+  }
+
+  DB::Status
+  RedisDB::Scan(const std::string &table, const std::string &start_key, int len,
+                const std::vector<std::string> *fields,
+                std::vector<std::unordered_map<std::string, std::string>> &result) {
+   std::vector<std::pair<std::string, double>> zset_result;
+   ycsb_command_ptr->zrangebyscore(index_name,
+                                   LeftBoundedInterval<double>(hash(start_key),
+                                                               BoundType::CLOSED),
+                                   {0, len},
+                                   std::back_inserter(zset_result));
+   for (auto key: zset_result) {
+    std::unordered_map<std::string, std::string> values;
+    Read(table, key.first, fields, values);
+    result.push_back(values);
+   }
+   return kOK;
   }
 
 } // ycsbc
