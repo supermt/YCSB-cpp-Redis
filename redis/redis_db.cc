@@ -46,30 +46,29 @@ namespace ycsbc {
              << target_link_posi << std::endl;
 
    cluster_ptr = new RedisCluster(target_link_posi);
+   std::unordered_map<std::string, std::string> str_map = {{"f1", "v1"},
+                                                           {"f2", "v2"},
+                                                           {"f3", "v3"}};
+   try { cluster_ptr->hmset("test", str_map.begin(), str_map.end()); }
+   catch (utils::Exception e) {
+    std::cout << "Testing failed" << e.what() << std::endl;
+   }
+
    std::cout
        << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Connected! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
        << std::endl;
 
-   ycsb_command_ptr = new Redis(cluster_ptr->redis("ycsb_link"));;
-
-   auto reply = ycsb_command_ptr->command("stats");
-   assert(reply);
-   auto val = reply::parse<OptionalString>(*reply);
-   if (val) {
-    std::cout << *val << std::endl;
-   }
+//   ycsb_command_ptr = new Redis(cluster_ptr->redis("ycsb_link"));
+//   auto reply = ycsb_command_ptr->command("stats");
+//   assert(reply);
+//   auto val = reply::parse<OptionalString>(*reply);
+//   if (val) {
+////    std::cout << *val << std::endl;
+//   }
    return;
   }
 
   void RedisDB::Cleanup() {
-
-   auto reply = ycsb_command_ptr->command("stats");
-   assert(reply);
-   auto val = reply::parse<OptionalString>(*reply);
-   if (val) {
-    std::cout << *val << std::endl;
-   }
-   delete ycsb_command_ptr;
    delete cluster_ptr;
    std::cout
        << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Clean the DB, close the redis cluster <<<<<<<<<<<<<<<<<<<<<<<<<<<"
@@ -82,11 +81,11 @@ namespace ycsbc {
                            const std::vector<std::string> *fields,
                            std::unordered_map<std::string, std::string> &result) {
    if (fields == nullptr) {
-    ycsb_command_ptr->hgetall(key, std::inserter(result, result.begin()));
+    cluster_ptr->hgetall(key, std::inserter(result, result.begin()));
    } else {
     std::vector<OptionalString> vals;
-    ycsb_command_ptr->hmget(key, fields->begin(), fields->end(),
-                            std::back_inserter(vals));
+    cluster_ptr->hmget(key, fields->begin(), fields->end(),
+                       std::back_inserter(vals));
 
     for (uint32_t i = 0; i < fields->size(); i++) {
      result.emplace(fields->at(i), vals.at(i).value());
@@ -128,32 +127,31 @@ namespace ycsbc {
   DB::Status RedisDB::Update(const std::string &table, const std::string &key,
                              std::unordered_map<std::string, std::string> &values) {
    try {
-    ycsb_command_ptr->hmset(key, values.begin(),
-                            values.end());
+    cluster_ptr->hmset(key, values.begin(),
+                       values.end());
     return DB::kOK;
    } catch (utils::Exception e) {
     std::cout << e.what() << std::endl;
     return DB::kError;
    }
-   return DB::kNotFound;
   }
 
   DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
                              std::unordered_map<std::string, std::string> &values) {
    try {
-    ycsb_command_ptr->hmset(key, values.begin(),
-                            values.end());
-    ycsb_command_ptr->zadd(index_name, key, hash(key));
+    cluster_ptr->hmset(key, values.begin(),
+                       values.end());
+    cluster_ptr->zadd(index_name, key, hash(key));
     return DB::kOK;
    } catch (utils::Exception e) {
-    std::cout << e.what() << std::endl;
+    std::cout << "Failed in Insert" << e.what() << std::endl;
     return DB::kError;
    }
   }
 
   DB::Status RedisDB::Delete(const std::string &table, const std::string &key) {
-   if (ycsb_command_ptr->del(key) == 0 &&
-       ycsb_command_ptr->zrem(index_name, key) == 0) {
+   if (cluster_ptr->del(key) == 0 &&
+       cluster_ptr->zrem(index_name, key) == 0) {
     return DB::kError;
    } else {
     return DB::kOK;
@@ -166,11 +164,11 @@ namespace ycsbc {
                 const std::vector<std::string> *fields,
                 std::vector<std::unordered_map<std::string, std::string>> &result) {
    std::vector<std::pair<std::string, double>> zset_result;
-   ycsb_command_ptr->zrangebyscore(index_name,
-                                   LeftBoundedInterval<double>(hash(start_key),
-                                                               BoundType::CLOSED),
-                                   {0, len},
-                                   std::back_inserter(zset_result));
+   cluster_ptr->zrangebyscore(index_name,
+                              LeftBoundedInterval<double>(hash(start_key),
+                                                          BoundType::CLOSED),
+                              {0, len},
+                              std::back_inserter(zset_result));
    for (auto key: zset_result) {
     std::unordered_map<std::string, std::string> values;
     Read(table, key.first, fields, values);

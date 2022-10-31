@@ -45,7 +45,6 @@ namespace ycsbc {
   private:
 
     sw::redis::RedisCluster *cluster_ptr;
-    sw::redis::Redis *ycsb_command_ptr;
     int fieldcount_;
     static int ref_cnt_;
     static std::mutex mu_;
