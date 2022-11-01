@@ -8,6 +8,23 @@ This repo add supports of Redis in YCSB-CPP (written by LEE)
 ./ycsb -run -db redis -P workloads/workloada -P redis/cluster.prop -s
 ```
 
+# Slot test
+
+We tend to skew the input according to the following three prefix, and make the
+two prefix stores in the first slot, in the second slot, and
+nothing in the third one.
+
+## Prefix
+
+- {Astartes} slot 3246 first machine
+- {UltraMarine} slot 7797 second machine
+- {DarkAngel} (crc16 = 7e24 HEX) mod 16385 = 15907
+- {DeathGuard} 11166 Third Machine
+
+## About the `rebalance` command in Redis
+
+This command will only re distribute the number of slots wihtin different nodes. 
+
 # YCSB-cpp
 
 Yahoo! Cloud Serving
