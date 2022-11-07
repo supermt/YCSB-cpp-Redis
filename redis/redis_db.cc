@@ -10,8 +10,6 @@
 
 #include "core/core_workload.h"
 #include "core/db_factory.h"
-#include "core/properties.h"
-#include "core/utils.h"
 
 namespace {
   const std::string REDIS_PORT = "redis.port";
@@ -63,15 +61,6 @@ namespace ycsbc {
    std::cout
        << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Connected! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
        << std::endl;
-
-//   ycsb_command_ptr = new Redis(cluster_ptr->redis("ycsb_link"));
-//   auto reply = ycsb_command_ptr->command("stats");
-//   assert(reply);
-//   auto val = reply::parse<OptionalString>(*reply);
-//   if (val) {
-////    std::cout << *val << std::endl;
-//   }
-   return;
   }
 
   void RedisDB::Cleanup() {
@@ -79,30 +68,37 @@ namespace ycsbc {
    std::cout
        << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Clean the DB, close the redis cluster <<<<<<<<<<<<<<<<<<<<<<<<<<<"
        << std::endl;
-
-   return;
   }
 
   DB::Status RedisDB::Read(const std::string &table, const std::string &key,
                            const std::vector<std::string> *fields,
                            std::unordered_map<std::string, std::string> &result) {
-   if (fields == nullptr) {
-    cluster_ptr->hgetall(key, std::inserter(result, result.begin()));
-   } else {
-    std::vector<OptionalString> vals;
-    cluster_ptr->hmget(key, fields->begin(), fields->end(),
-                       std::back_inserter(vals));
+   bool success = false;
+   int try_times = 0;
+   try {
+    while (!success) {
+     if (fields == nullptr) {
+      cluster_ptr->hgetall(key, std::inserter(result, result.begin()));
+     } else {
+      std::vector<OptionalString> vals;
+      cluster_ptr->hmget(key, fields->begin(), fields->end(),
+                         std::back_inserter(vals));
 
-    for (uint32_t i = 0; i < fields->size(); i++) {
-     result.emplace(fields->at(i), vals.at(i).value());
+      for (uint32_t i = 0; i < fields->size(); i++) {
+       result.emplace(fields->at(i), vals.at(i).value());
+      }
+     }
+     try_times++;
+     success = true;
     }
-//    auto field_iter = fields->begin();
-//    auto value_iter = vals.begin();
-//    while (field_iter != fields->end() && value_iter != vals.end()) {
-//     result.emplace(*field_iter, *value_iter);
-//    }
+   } catch (const Error &e) {
+    success = false;
+    if (try_times > max_try) {
+     return kError;
+    }
+    std::cout << "Error when reading: " << e.what() << std::endl;
    }
-   return result.size() == 0 ? kNotFound : kOK;
+   return result.empty() ? kNotFound : kOK;
   }
 
   inline std::wstring s2ws(const std::string &str) {
@@ -111,7 +107,7 @@ namespace ycsbc {
    }
    unsigned len = str.size() + 1;
    setlocale(LC_CTYPE, "en_US.UTF-8");
-   wchar_t *p = new wchar_t[len];
+   auto *p = new wchar_t[len];
    mbstowcs(p, str.c_str(), len);
    std::wstring w_str(p);
    delete[] p;
@@ -121,9 +117,9 @@ namespace ycsbc {
   inline int32_t hash(const std::string &input) {
    int32_t h = 0;
    std::wstring wstr = s2ws(input);
-   if (h == 0 && wstr.length() > 0) {
-    for (uint32_t i = 0; i < wstr.length(); i++) {
-     h = 31 * h + wstr.at(i);
+   if (wstr.length() > 0) {
+    for (wchar_t i: wstr) {
+     h = 31 * h + i;
     }
    }
    return h;
@@ -139,17 +135,16 @@ namespace ycsbc {
     while (!success) {
      cluster_ptr->hmset(key, values.begin(),
                         values.end());
-     if (try_times > 0) {
+     if (try_times > 1) {
       std::cout << "tried for :" << try_times << "times" << std::endl;
      }
-
+     try_times++;
      success = true;
     }
     return DB::kOK;
    } catch (const Error &e) {
     success = false;
     if (try_times >= max_try) { return DB::kError; }
-    try_times++;
     std::cout << "Failed in updating" << e.what() << std::endl;
    }
    return DB::kError;
@@ -165,24 +160,25 @@ namespace ycsbc {
     while (!hmset_success) {
      cluster_ptr->hmset(key, values.begin(),
                         values.end());
-     if (try_times > 0) {
+     if (try_times > 1) {
       std::cout << "tried for :" << try_times << "times" << std::endl;
      }
+     try_times++;
      hmset_success = true;
     }
 
     while (!zadd_success) {
      cluster_ptr->zadd(index_name, key, hash(key));
-     if (try_times > 0) {
+     if (try_times > 1) {
       std::cout << "tried for :" << try_times << "times" << std::endl;
      }
+     try_times++;
      zadd_success = true;
     }
     return DB::kOK;
    } catch (const Error &e) {
     hmset_success = false;
     zadd_success = false;
-    try_times++;
     std::cout << "Failed in Insert" << e.what() << std::endl;
     return DB::kError;
    }
