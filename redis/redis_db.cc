@@ -23,6 +23,9 @@ namespace {
   const std::string REDIS_INDEX_NAME = "redis.index";
   const std::string REDIS_INDEX_NAME_DEFAULT = "_indices";
 
+  const std::string REDIS_MAX_TRY_NAME = "redis.max_try";
+  const std::string REDIS_MAX_TRY_DEFAULT = "1000";
+
 } // anonymous
 
 namespace ycsbc {
@@ -40,17 +43,20 @@ namespace ycsbc {
    auto port = props_->GetProperty(REDIS_PORT, REDIS_PORT_DEFAULT);
 
    index_name = props_->GetProperty(REDIS_INDEX_NAME, REDIS_INDEX_NAME_DEFAULT);
+   max_try = std::stoi(
+       props_->GetProperty(REDIS_MAX_TRY_NAME, REDIS_MAX_TRY_DEFAULT));
 
    std::string target_link_posi = "tcp://" + host + ":" + port;
    std::cout << "Initializing, create redis cluster link at "
              << target_link_posi << std::endl;
+
 
    cluster_ptr = new RedisCluster(target_link_posi);
    std::unordered_map<std::string, std::string> str_map = {{"f1", "v1"},
                                                            {"f2", "v2"},
                                                            {"f3", "v3"}};
    try { cluster_ptr->hmset("test", str_map.begin(), str_map.end()); }
-   catch (utils::Exception e) {
+   catch (const Error &e) {
     std::cout << "Testing failed" << e.what() << std::endl;
    }
 
@@ -126,24 +132,57 @@ namespace ycsbc {
 
   DB::Status RedisDB::Update(const std::string &table, const std::string &key,
                              std::unordered_map<std::string, std::string> &values) {
+
+   bool success = false;
+   int try_times = 0;
    try {
-    cluster_ptr->hmset(key, values.begin(),
-                       values.end());
+    while (!success) {
+     cluster_ptr->hmset(key, values.begin(),
+                        values.end());
+     if (try_times > 0) {
+      std::cout << "tried for :" << try_times << "times" << std::endl;
+     }
+
+     success = true;
+    }
     return DB::kOK;
-   } catch (utils::Exception e) {
-    std::cout << e.what() << std::endl;
-    return DB::kError;
+   } catch (const Error &e) {
+    success = false;
+    if (try_times >= max_try) { return DB::kError; }
+    try_times++;
+    std::cout << "Failed in updating" << e.what() << std::endl;
    }
+   return DB::kError;
   }
 
   DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
                              std::unordered_map<std::string, std::string> &values) {
+
+   bool hmset_success = false;
+   bool zadd_success = false;
+   int try_times = 0;
    try {
-    cluster_ptr->hmset(key, values.begin(),
-                       values.end());
-    cluster_ptr->zadd(index_name, key, hash(key));
+    while (!hmset_success) {
+     cluster_ptr->hmset(key, values.begin(),
+                        values.end());
+     if (try_times > 0) {
+      std::cout << "tried for :" << try_times << "times" << std::endl;
+     }
+     hmset_success = true;
+    }
+
+    while (!zadd_success) {
+     cluster_ptr->zadd(index_name, key, hash(key));
+     if (try_times > 0) {
+      std::cout << "tried for :" << try_times << "times" << std::endl;
+     }
+     zadd_success = true;
+    }
     return DB::kOK;
-   } catch (utils::Exception e) {
+   } catch (const Error &e) {
+    hmset_success = false;
+    zadd_success = false;
+    try_times++;
     std::cout << "Failed in Insert" << e.what() << std::endl;
     return DB::kError;
    }

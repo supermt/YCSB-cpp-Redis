@@ -49,6 +49,7 @@ namespace ycsbc {
     static int ref_cnt_;
     static std::mutex mu_;
     std::string index_name;
+    int max_try;
   };
 
   DB *NewRedisDB();
