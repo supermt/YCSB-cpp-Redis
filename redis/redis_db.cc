@@ -153,8 +153,14 @@ namespace ycsbc {
   DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
                              std::unordered_map<std::string, std::string> &values) {
 
+//	  std::cout << values.size() << std::endl;
+//	  int a = 0;
+//	  for (auto value: values){
+//	  a+=value.second.size();
+//	  }
+//	  std::cout << a << std::endl;
    bool hmset_success = false;
-   bool zadd_success = false;
+//   bool zadd_success = false;
    int try_times = 0;
    try {
     while (!hmset_success) {
@@ -167,18 +173,18 @@ namespace ycsbc {
      hmset_success = true;
     }
 
-    while (!zadd_success) {
-     cluster_ptr->zadd(index_name, key, hash(key));
-     if (try_times > 1) {
-      std::cout << "tried for :" << try_times << "times" << std::endl;
-     }
-     try_times++;
-     zadd_success = true;
-    }
+//    while (!zadd_success) {
+//     cluster_ptr->zadd(index_name, key, hash(key));
+//     if (try_times > 1) {
+//      std::cout << "tried for :" << try_times << "times" << std::endl;
+//     }
+//     try_times++;
+//     zadd_success = true;
+//    }
     return DB::kOK;
    } catch (const Error &e) {
     hmset_success = false;
-    zadd_success = false;
+//    zadd_success = false;
     std::cout << "Failed in Insert" << e.what() << std::endl;
     return DB::kError;
    }

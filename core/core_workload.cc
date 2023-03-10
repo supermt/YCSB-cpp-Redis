@@ -16,6 +16,7 @@
 #include "random_byte_generator.h"
 
 #include <algorithm>
+#include <iostream>
 #include <random>
 #include <string>
 
@@ -195,6 +196,7 @@ ycsbc::Generator<uint64_t> *CoreWorkload::GetFieldLenGenerator(
                                        FIELD_LENGTH_DISTRIBUTION_DEFAULT);
  int field_len = std::stoi(
      p.GetProperty(FIELD_LENGTH_PROPERTY, FIELD_LENGTH_DEFAULT));
+ std::cout << "filed length is: " << field_len <<std::endl;
  if (field_len_dist == "constant") {
   return new ConstGenerator(field_len);
  } else if (field_len_dist == "uniform") {
