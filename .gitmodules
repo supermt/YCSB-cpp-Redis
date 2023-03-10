@@ -1,3 +1,6 @@
 [submodule "redis/support/redis-plus-plus"]
 	path = redis/support/redis-plus-plus
 	url = https://github.com/sewenew/redis-plus-plus
+[submodule "tools/HdrHistogram_c"]
+	path = tools/HdrHistogram_c
+	url = https://github.com/HdrHistogram/HdrHistogram_c
