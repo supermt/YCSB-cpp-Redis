@@ -50,7 +50,7 @@ endif
 
 
 CXXFLAGS += -std=c++17 -Wall -pthread $(EXTRA_CXXFLAGS) -I./
-LDFLAGS += $(EXTRA_LDFLAGS) -lpthread
+LDFLAGS += $(EXTRA_LDFLAGS) -lpthread -lhdr_histogram
 SOURCES += $(wildcard core/*.cc)
 OBJECTS += $(SOURCES:.cc=.o)
 DEPS += $(SOURCES:.cc=.d)
