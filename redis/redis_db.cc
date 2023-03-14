@@ -207,7 +207,7 @@ namespace ycsbc {
    std::vector<std::pair<std::string, double>> zset_result;
    cluster_ptr->zrangebyscore(index_name,
                               LeftBoundedInterval<double>(hash(start_key),
-                                                          BoundType::CLOSED),
+                                                          BoundType::RIGHT_OPEN),
                               {0, len},
                               std::back_inserter(zset_result));
    for (auto key: zset_result) {

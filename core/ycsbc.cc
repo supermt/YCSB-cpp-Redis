@@ -146,7 +146,7 @@ int main(const int argc, const char *argv[]) {
   if (show_status) {
    status_future = std::async(std::launch::async, StatusThread,
                               &measurements, &latch, status_interval,
-                              props.GetProperty("report", "") + "load_");
+                              props.GetProperty("report", "") + "run_");
   }
   std::vector<std::future<int>> client_threads;
   for (int i = 0; i < num_threads; ++i) {
