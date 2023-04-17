@@ -53,7 +53,7 @@ namespace ycsbc {
         assert(cluster_ptr);
 //        std::unordered_map<std::string, std::string> str_map = {{"f1", "v1"},
 //                                                                {"f2", "v2"},
-//                                                                {"f3", "v3"}};
+//                                                               {"f3", "v3"}};
 //        try { cluster_ptr->hmset("test", str_map.begin(), str_map.end()); }
 //        catch (const Error &e) {
 //            std::cout << "Testing failed" << e.what() << std::endl;
@@ -91,9 +91,13 @@ namespace ycsbc {
                 try_times++;
                 success = true;
             }
+        } catch (const IoError &link_error) {
+            assert(false);
+        }
+        catch (const MovedError &e) {
+            assert(false);
         } catch (const Error &e) {
             return DB::kError;
-
         }
         return result.empty() ? kNotFound : kOK;
     }
@@ -139,61 +143,50 @@ namespace ycsbc {
                 success = true;
             }
             return DB::kOK;
+        } catch (const IoError &link_error) {
+            assert(false);
+        }
+        catch (const MovedError &e) {
+            assert(false);
         } catch (const Error &e) {
             return DB::kError;
-//    std::cout << "Failed in updating" << e.what() << std::endl;
         }
         return DB::kError;
     }
 
     DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
                                std::unordered_map<std::string, std::string> &values) {
-
-//	  std::cout << values.size() << std::endl;
-//	  int a = 0;
-//	  for (auto value: values){
-//	  a+=value.second.size();
-//	  }
-//	  std::cout << a << std::endl;
-        bool hmset_success = false;
-//   bool zadd_success = false;
-        int try_times = 0;
         try {
-            while (!hmset_success) {
-                cluster_ptr->hmset(key, values.begin(),
-                                   values.end());
-                if (try_times > 1) {
-                    std::cout << "tried for :" << try_times << "times" << std::endl;
-                }
-                try_times++;
-                hmset_success = true;
-            }
-
-//    while (!zadd_success) {
-//     cluster_ptr->zadd(index_name, key, hash(key));
-//     if (try_times > 1) {
-//      std::cout << "tried for :" << try_times << "times" << std::endl;
-//     }
-//     try_times++;
-//     zadd_success = true;
-//    }
-            return DB::kOK;
+            cluster_ptr->hmset(key, values.begin(),
+                               values.end());
+        } catch (const IoError &link_error) {
+            assert(false);
+        }
+        catch (const MovedError &e) {
+            assert(false);
         } catch (const Error &e) {
-            hmset_success = false;
-//    zadd_success = false;
-//            std::cout << "Failed in Insert" << e.what() << std::endl;
             return DB::kError;
         }
+        return DB::kOK;
     }
 
     DB::Status RedisDB::Delete(const std::string &table, const std::string &key) {
-        if (cluster_ptr->del(key) == 0 &&
-            cluster_ptr->zrem(index_name, key) == 0) {
-            return DB::kError;
-        } else {
-            return DB::kOK;
+        try {
+            if (cluster_ptr->del(key) == 0 &&
+                cluster_ptr->zrem(index_name, key) == 0) {
+                return DB::kNotFound;
+            } else {
+                return DB::kOK;
+            }
+        } catch (const IoError &link_error) {
+            assert(false);
         }
-
+        catch (const MovedError &e) {
+            assert(false);
+        } catch (const Error &e) {
+            return DB::kError;
+        }
+        return DB::kOK;
     }
 
     DB::Status
@@ -201,15 +194,25 @@ namespace ycsbc {
                   const std::vector<std::string> *fields,
                   std::vector<std::unordered_map<std::string, std::string>> &result) {
         std::vector<std::pair<std::string, double>> zset_result;
-        cluster_ptr->zrangebyscore(index_name,
-                                   LeftBoundedInterval<double>(hash(start_key),
-                                                               BoundType::RIGHT_OPEN),
-                                   {0, len},
-                                   std::back_inserter(zset_result));
-        for (auto key: zset_result) {
-            std::unordered_map<std::string, std::string> values;
-            Read(table, key.first, fields, values);
-            result.push_back(values);
+        try {
+
+            cluster_ptr->zrangebyscore(index_name,
+                                       LeftBoundedInterval<double>(hash(start_key),
+                                                                   BoundType::RIGHT_OPEN),
+                                       {0, len},
+                                       std::back_inserter(zset_result));
+            for (auto key: zset_result) {
+                std::unordered_map<std::string, std::string> values;
+                Read(table, key.first, fields, values);
+                result.push_back(values);
+            }
+        } catch (const IoError &link_error) {
+            assert(false);
+        }
+        catch (const MovedError &e) {
+            assert(false);
+        } catch (const Error &e) {
+            return DB::kError;
         }
         return kOK;
     }
