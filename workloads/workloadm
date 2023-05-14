@@ -14,10 +14,16 @@ readallfields=true
 fieldlength=100
 fieldcount=10
 
+keyrange_dist_a=14.18
+keyrange_dist_b=-2.917
+keyrange_dist_c=0.0164
+keyrange_dist_d=-0.08082
+keyrange_no=30
+
 readproportion=0.5
 updateproportion=0.5
 scanproportion=0
 insertproportion=0
 
-requestdistribution=zipfian
+requestdistribution=mixgraph
 

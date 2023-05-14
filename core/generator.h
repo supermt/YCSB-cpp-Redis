@@ -13,13 +13,22 @@
 
 namespace ycsbc {
 
-template <typename Value>
-class Generator {
- public:
-  virtual Value Next() = 0;
-  virtual Value Last() = 0;
-  virtual ~Generator() { }
-};
+    template<typename Value>
+    class Generator {
+    public:
+        virtual Value Next() = 0;
+
+        virtual Value Last() = 0;
+
+        virtual Value LastPrefix();
+
+        virtual ~Generator() {}
+    };
+
+    template<typename Value>
+    Value Generator<Value>::LastPrefix() {
+        return Value();
+    }
 
 } // ycsbc
 
