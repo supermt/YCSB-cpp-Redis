@@ -1,2 +1,3 @@
 redis.port=30001
 redis.host=127.0.0.1
+redis.db_num=15

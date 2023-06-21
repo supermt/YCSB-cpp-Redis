@@ -24,6 +24,9 @@ namespace {
     const std::string REDIS_MAX_TRY_NAME = "redis.max_try";
     const std::string REDIS_MAX_TRY_DEFAULT = "1000";
 
+    const std::string REDIS_DB_NUM = "redis.db_num";
+    const std::string REDIS_DB_NUM_DEFAULT = "1";
+
 } // anonymous
 
 namespace ycsbc {
@@ -40,6 +43,8 @@ namespace ycsbc {
         auto host = props_->GetProperty(REDIS_HOST, REDIS_HOST_DEFAULT);
         auto port = props_->GetProperty(REDIS_PORT, REDIS_PORT_DEFAULT);
 
+        auto db_num = props_->GetProperty(REDIS_DB_NUM, REDIS_DB_NUM_DEFAULT);
+
         index_name = props_->GetProperty(REDIS_INDEX_NAME, REDIS_INDEX_NAME_DEFAULT);
         max_try = std::stoi(
                 props_->GetProperty(REDIS_MAX_TRY_NAME, REDIS_MAX_TRY_DEFAULT));
@@ -52,7 +57,7 @@ namespace ycsbc {
         connection_options.host = host;  // Required.
         connection_options.port = std::stoi(port); // Optional. The default port is 6379.
 //        connection_options.password = "auth";   // Optional. No password by default.
-        connection_options.db = 1;  // Optional. Use the 0th database by default.
+        connection_options.db = std::stoi(db_num);  // Optional. Use the 0th database by default.
 
         connection_options.socket_timeout = std::chrono::milliseconds(100);
 
