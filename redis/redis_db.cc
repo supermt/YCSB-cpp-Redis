@@ -97,20 +97,16 @@ namespace ycsbc {
         bool success = false;
         int try_times = 0;
         try {
-            while (!success) {
-                if (fields == nullptr) {
-                    cluster_ptr->hgetall(key, std::inserter(result, result.begin()));
-                } else {
-                    std::vector<OptionalString> vals;
-                    cluster_ptr->hmget(key, fields->begin(), fields->end(),
-                                       std::back_inserter(vals));
+            if (fields == nullptr) {
+                cluster_ptr->hgetall(key, std::inserter(result, result.begin()));
+            } else {
+                std::vector<OptionalString> vals;
+                cluster_ptr->hmget(key, fields->begin(), fields->end(),
+                                   std::back_inserter(vals));
 
-                    for (uint32_t i = 0; i < fields->size(); i++) {
-                        result.emplace(fields->at(i), vals.at(i).value());
-                    }
+                for (uint32_t i = 0; i < fields->size(); i++) {
+                    result.emplace(fields->at(i), vals.at(i).value());
                 }
-                try_times++;
-                success = true;
             }
         } catch (const Error &e) {
             return DB::kError;
@@ -149,23 +145,15 @@ namespace ycsbc {
         bool success = false;
         int try_times = 0;
         try {
-            while (!success) {
-                cluster_ptr->hmset(key, values.begin(),
-                                   values.end());
-                if (try_times > 1) {
-                    std::cout << "tried for :" << try_times << "times" << std::endl;
-                }
-                try_times++;
-                success = true;
-            }
-            return DB::kOK;
+            cluster_ptr->hmset(key, values.begin(),
+                               values.end());
         } catch (const Error &e) {
             if (std::string(e.what()) == "Failed to send command") {
 
             }
             return DB::kError;
         }
-        return DB::kError;
+        return DB::kOK;
     }
 
     DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
@@ -190,7 +178,6 @@ namespace ycsbc {
         } catch (const Error &e) {
             return DB::kError;
         }
-        return DB::kOK;
     }
 
     DB::Status
