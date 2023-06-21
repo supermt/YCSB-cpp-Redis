@@ -20,7 +20,7 @@
 
 namespace ycsbc {
 
-    class RedisDB : public DB {
+    class KVRocks : public DB {
     public:
 
         void Init();
@@ -53,7 +53,7 @@ namespace ycsbc {
         int max_try;
     };
 
-    DB *NewRedisDB();
+    DB *NewKVRocks();
 
 } // ycsbc
 

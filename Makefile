@@ -17,7 +17,7 @@ BIND_LEVELDB ?= 1
 BIND_ROCKSDB ?= 0
 BIND_LMDB ?= 0
 BIND_REDIS ?= 1
-
+BIND_KVROCKS ?= 1
 #----------------------------------------------------------
 
 ifeq ($(DEBUG_BUILD), 1)
@@ -48,6 +48,10 @@ ifeq ($(BIND_REDIS), 1)
 	SOURCES += $(wildcard redis/*.cc)
 endif
 
+ifeq ($(BIND_KVROCKS), 1)
+	LDFLAGS += -lhiredis -lredis++
+	SOURCES += $(wildcard kvrocks/*.cc)
+endif
 
 CXXFLAGS += -std=c++17 -Wall -pthread $(EXTRA_CXXFLAGS) -I./
 LDFLAGS += $(EXTRA_LDFLAGS) -lpthread -lhdr_histogram

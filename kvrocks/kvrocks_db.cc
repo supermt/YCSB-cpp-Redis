@@ -6,7 +6,7 @@
 //
 
 #include <iostream>
-#include "redis_db.h"
+#include "kvrocks.h"
 #include <cassert>
 #include "core/core_workload.h"
 #include "core/db_factory.h"
@@ -22,7 +22,7 @@ namespace {
     const std::string REDIS_INDEX_NAME_DEFAULT = "_indices";
 
     const std::string REDIS_MAX_TRY_NAME = "redis.max_try";
-    const std::string REDIS_MAX_TRY_DEFAULT = "1000";
+    const std::string REDIS_MAX_TRY_DEFAULT = "10";
 
 } // anonymous
 
@@ -30,13 +30,13 @@ namespace ycsbc {
 
 // Create Redis link
     using namespace sw::redis;
-    const bool registered = DBFactory::RegisterDB("redis", NewRedisDB);
+    const bool registered = DBFactory::RegisterDB("kvrocks", NewKVRocks);
 
-    DB *NewRedisDB() {
-        return new RedisDB;
+    DB *NewKVRocks() {
+        return new KVRocks;
     }
 
-    void RedisDB::Init() {
+    void KVRocks::Init() {
         auto host = props_->GetProperty(REDIS_HOST, REDIS_HOST_DEFAULT);
         auto port = props_->GetProperty(REDIS_PORT, REDIS_PORT_DEFAULT);
 
@@ -48,45 +48,22 @@ namespace ycsbc {
         std::cout << "Initializing, create redis cluster link at "
                   << target_link_posi << std::endl;
 
-        ConnectionOptions connection_options;
-        connection_options.host = host;  // Required.
-        connection_options.port = std::stoi(port); // Optional. The default port is 6379.
-//        connection_options.password = "auth";   // Optional. No password by default.
-        connection_options.db = 1;  // Optional. Use the 0th database by default.
 
-        connection_options.socket_timeout = std::chrono::milliseconds(100);
-
-        ConnectionPoolOptions pool_options;
-        pool_options.size = 3;  // Pool size, i.e. max number of connections.
-
-        pool_options.wait_timeout = std::chrono::milliseconds(100);
-
-//        pool_options.connection_lifetime = std::chrono::minutes(10);
-
-        cluster_ptr = new RedisCluster(connection_options, pool_options);
-
-//        cluster_ptr = new RedisCluster(target_link_posi);
+        cluster_ptr = new RedisCluster(target_link_posi);
         assert(cluster_ptr);
-//        std::unordered_map<std::string, std::string> str_map = {{"f1", "v1"},
-//                                                                {"f2", "v2"},
-//                                                               {"f3", "v3"}};
-//        try { cluster_ptr->hmset("test", str_map.begin(), str_map.end()); }
-//        catch (const Error &e) {
-//            std::cout << "Testing failed" << e.what() << std::endl;
-//        }
-//
+
         std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Connected! <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
                   << std::endl;
     }
 
-    void RedisDB::Cleanup() {
+    void KVRocks::Cleanup() {
         delete cluster_ptr;
         std::cout
                 << ">>>>>>>>>>>>>>>>>>>>>>>>>>> Clean the DB, close the redis cluster <<<<<<<<<<<<<<<<<<<<<<<<<<<"
                 << std::endl;
     }
 
-    DB::Status RedisDB::Read(const std::string &table, const std::string &key,
+    DB::Status KVRocks::Read(const std::string &table, const std::string &key,
                              const std::vector<std::string> *fields,
                              std::unordered_map<std::string, std::string> &result) {
         bool success = false;
@@ -107,6 +84,11 @@ namespace ycsbc {
                 try_times++;
                 success = true;
             }
+        } catch (const IoError &link_error) {
+            assert(false);
+        }
+        catch (const MovedError &e) {
+            assert(false);
         } catch (const Error &e) {
             return DB::kError;
         }
@@ -138,7 +120,7 @@ namespace ycsbc {
     }
 
 
-    DB::Status RedisDB::Update(const std::string &table, const std::string &key,
+    DB::Status KVRocks::Update(const std::string &table, const std::string &key,
                                std::unordered_map<std::string, std::string> &values) {
 
         bool success = false;
@@ -154,6 +136,13 @@ namespace ycsbc {
                 success = true;
             }
             return DB::kOK;
+        } catch (const IoError &link_error) {
+            assert(false);
+            exit(-1);
+        }
+        catch (const MovedError &e) {
+            assert(false);
+            exit(-1);
         } catch (const Error &e) {
             if (std::string(e.what()) == "Failed to send command") {
 
@@ -163,25 +152,19 @@ namespace ycsbc {
         return DB::kError;
     }
 
-    DB::Status RedisDB::Insert(const std::string &table, const std::string &key,
+    DB::Status KVRocks::Insert(const std::string &table, const std::string &key,
                                std::unordered_map<std::string, std::string> &values) {
         try {
-            cluster_ptr->hmset(key, values.begin(),
-                               values.end());
+            cluster_ptr->sadd(key, values[0]);
         } catch (const Error &e) {
             return DB::kError;
         }
         return DB::kOK;
     }
 
-    DB::Status RedisDB::Delete(const std::string &table, const std::string &key) {
+    DB::Status KVRocks::Delete(const std::string &table, const std::string &key) {
         try {
-            if (cluster_ptr->del(key) == 0 &&
-                cluster_ptr->zrem(index_name, key) == 0) {
-                return DB::kNotFound;
-            } else {
-                return DB::kOK;
-            }
+            cluster_ptr->del(key);
         } catch (const Error &e) {
             return DB::kError;
         }
@@ -189,22 +172,15 @@ namespace ycsbc {
     }
 
     DB::Status
-    RedisDB::Scan(const std::string &table, const std::string &start_key, int len,
+    KVRocks::Scan(const std::string &table, const std::string &start_key, int len,
                   const std::vector<std::string> *fields,
                   std::vector<std::unordered_map<std::string, std::string>> &result) {
-        std::vector<std::pair<std::string, double>> zset_result;
         try {
+//            auto cursor = 0LL;
+//            auto pattern = "*pattern*";
+//            auto count = len;
+//            std::unordered_set<std::string> keys;
 
-            cluster_ptr->zrangebyscore(index_name,
-                                       LeftBoundedInterval<double>(hash(start_key),
-                                                                   BoundType::RIGHT_OPEN),
-                                       {0, len},
-                                       std::back_inserter(zset_result));
-            for (auto key: zset_result) {
-                std::unordered_map<std::string, std::string> values;
-                Read(table, key.first, fields, values);
-                result.push_back(values);
-            }
         } catch (const Error &e) {
             return DB::kError;
         }
