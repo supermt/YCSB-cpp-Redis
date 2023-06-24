@@ -94,8 +94,6 @@ namespace ycsbc {
     DB::Status RedisDB::Read(const std::string &table, const std::string &key,
                              const std::vector<std::string> *fields,
                              std::unordered_map<std::string, std::string> &result) {
-        bool success = false;
-        int try_times = 0;
         try {
             if (fields == nullptr) {
                 cluster_ptr->hgetall(key, std::inserter(result, result.begin()));
@@ -141,9 +139,6 @@ namespace ycsbc {
 
     DB::Status RedisDB::Update(const std::string &table, const std::string &key,
                                std::unordered_map<std::string, std::string> &values) {
-
-        bool success = false;
-        int try_times = 0;
         try {
             cluster_ptr->hmset(key, values.begin(),
                                values.end());
