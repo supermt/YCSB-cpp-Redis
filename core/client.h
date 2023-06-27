@@ -17,28 +17,31 @@
 
 namespace ycsbc {
 
-inline int ClientThread(ycsbc::DB *db, ycsbc::CoreWorkload *wl, const int num_ops, bool is_loading,
-                        bool init_db, bool cleanup_db, CountDownLatch *latch) {
-  if (init_db) {
-    db->Init();
-  }
+    inline int
+    ClientThread(ycsbc::DB *db, ycsbc::CoreWorkload *wl, std::atomic_int64_t *num_ops, const int64_t total_ops,
+                 bool is_loading,
+                 bool init_db, bool cleanup_db, CountDownLatch *latch) {
+        if (init_db) {
+            db->Init();
+        }
 
-  int oks = 0;
-  for (int i = 0; i < num_ops; ++i) {
-    if (is_loading) {
-      oks += wl->DoInsert(*db);
-    } else {
-      oks += wl->DoTransaction(*db);
+        int oks = 0;
+        while (*num_ops < total_ops) {
+            if (is_loading) {
+                oks += wl->DoInsert(*db);
+            } else {
+                oks += wl->DoTransaction(*db);
+            }
+            num_ops->fetch_add(1);
+        }
+
+        if (cleanup_db) {
+            db->Cleanup();
+        }
+
+        latch->CountDown();
+        return oks;
     }
-  }
-
-  if (cleanup_db) {
-    db->Cleanup();
-  }
-
-  latch->CountDown();
-  return oks;
-}
 
 } // ycsbc
 
