@@ -275,6 +275,7 @@ namespace ycsbc {
         int total_slot_number_ = 16384;
         std::vector<double> key_range_ratio_;
         DiscreteGenerator<int> slot_chooser_;
+        bool is_mixgraph_ = false;
 //        FILE *key_range_result;
     };
 
@@ -293,7 +294,7 @@ namespace ycsbc {
 
     inline bool CoreWorkload::DoInsert(DB &db) {
         std::string key;
-        if (key_range_count_ > 1) {
+        if (key_range_count_ > 1 && is_mixgraph_) {
             key = BuildKeyName(key_chooser_->Next());
         } else {
             key = BuildKeyName(insert_key_sequence_->Next());

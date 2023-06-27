@@ -15,6 +15,7 @@
 #include "core_workload.h"
 #include "random_byte_generator.h"
 
+#include "crc16_slots.h"
 #include <algorithm>
 #include <iostream>
 #include <random>
@@ -139,7 +140,7 @@ void CoreWorkload::Init(const utils::Properties &p) {
     key_range_count_ = std::stoi(p.GetProperty(KEY_RANGE_NO_PROPERTY, KEY_RANGE_NO_DEFAULT));
     total_slot_number_ = std::stoi(p.GetProperty(TOTAL_SLOTS_PROPERTY, TOTAL_SLOTS_DEFAULT));
 
-    if (key_range_count_ > 1) {
+    if (key_range_count_ > 1 && is_mixgraph_) {
         auto temp = p.GetProperty(KEY_RANGE_HOTNESS_ARRAY_PROPERTY, KEY_RANGE_HOTNESS_ARRAY_DEFAULT);
         auto temp_vector = utils::split(temp, ",");
         int i = 0;
@@ -218,6 +219,7 @@ void CoreWorkload::Init(const utils::Properties &p) {
         double c = std::stod(p.GetProperty(KEY_RANGE_DIST_C_PROPERTY, KEY_RANGE_DIST_C_DEFAULT));
         double d = std::stod(p.GetProperty(KEY_RANGE_DIST_D_PROPERTY, KEY_RANGE_DIST_D_DEFAULT));
         key_chooser_ = new TwoTermExpKeysGenerator(key_range_count_, record_count_, a, b, c, d);
+        is_mixgraph_ = true;
 //        key_range_result = fopen("prefix_list.txt", "w");
     } else {
         throw utils::Exception("Unknown request distribution: " + request_dist);
@@ -259,16 +261,29 @@ std::string CoreWorkload::BuildKeyName(uint64_t key_num) {
         key_num = utils::Hash(key_num);
     }
     std::string prekey;
+//    std::cout << key_num << ",";
     if (key_range_count_ > 1) {
-        prekey = "{" + std::to_string(key_chooser_->LastPrefix()) + "}";
-        key_num = key_chooser_->Last() - key_chooser_->LastPrefix();
+        if (is_mixgraph_) {
+//            prekey = "{" + std::to_string(key_chooser_->LastPrefix()) + "}";
+            prekey = "{";
+            prekey += crc16_slot_table[key_chooser_->LastPrefix() % total_slot_number_];
+            prekey += "}";
+            key_num = key_chooser_->Last() - key_chooser_->LastPrefix();
+        } else {
+            prekey = "{";
+            prekey += crc16_slot_table[key_num % key_range_count_];
+            prekey += "}";
+//            std::cout << prekey << std::endl;
+        }
     } else {
         prekey = "user";
     }
     std::string value = std::to_string(key_num);
     int fill = 0;
     if (key_range_count_ > 1) {
-        fill = std::max(0, key_len_ - static_cast<int>(value.size() + prekey.size()));
+        if (is_mixgraph_) {
+            fill = std::max(0, key_len_ - static_cast<int>(value.size() + prekey.size()));
+        }
     } else {
         fill = std::max(0, zero_padding_ - static_cast<int>(value.size()));
     }
